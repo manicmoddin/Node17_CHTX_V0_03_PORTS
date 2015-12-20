@@ -7,12 +7,13 @@
  * 0.01     Initial Write
  * 0.02     Added the override funtion with static LED, Activity LED
  * 0.03     Added the logic to stop it constantly writing to the relays, 
-            just on change
-            
+ just on change
+ 
  *
  */
 
 #include <JeeLib.h>
+int debug = 1;
 
 const int activityLed = 9;
 
@@ -31,10 +32,11 @@ Port overridePort(1);
 Port leds(4);
 
 typedef struct {
-  	  int pump;		                                      
-	  int boiler;	
-          int override;	                                      
-} Payload;
+  int pump;		                                      
+  int boiler;	
+  int override;	                                      
+} 
+Payload;
 Payload centralHeating;
 
 long previousMillis = 0;        // will store last time LED was updated
@@ -42,54 +44,55 @@ long interval = 10000;          // interval at which to blink (milliseconds)
 long pwmInterval = 30;
 
 void setup () {
-    rf12_initialize(17, RF12_433MHZ, 210);
-    pinMode(activityLed, OUTPUT);
+  rf12_initialize(17, RF12_433MHZ, 210);
+  pinMode(activityLed, OUTPUT);
 
-    leds.mode(OUTPUT);
-    leds.mode2(OUTPUT);
-    leds.digiWrite(0);
-    leds.digiWrite2(0);
-    
-    overridePort.mode(INPUT);
-    overridePort.mode2(OUTPUT);
-    
-    relays.mode(OUTPUT);
-    relays.mode2(OUTPUT);
-    relays.digiWrite(0);
-    relays.digiWrite2(0);
-    
-    Serial.begin(9600);
+  leds.mode(OUTPUT);
+  leds.mode2(OUTPUT);
+  leds.digiWrite(0);
+  leds.digiWrite2(0);
+
+  overridePort.mode(INPUT);
+  overridePort.mode2(OUTPUT);
+
+  relays.mode(OUTPUT);
+  relays.mode2(OUTPUT);
+  relays.digiWrite(0);
+  relays.digiWrite2(0);
+
+  Serial.begin(9600);
 }
 
 void loop () {
-    if (rf12_recvDone() && rf12_crc == 0 && rf12_len == 2) {
-      centralHeating.boiler = rf12_data[0];
-      centralHeating.pump = rf12_data[1];
-      if (mainOverride == 1 ) {
-        //data has come in while override is on
+  if (rf12_recvDone() && rf12_crc == 0 && rf12_len == 2) {
+    centralHeating.boiler = rf12_data[0];
+    centralHeating.pump = rf12_data[1];
+    if (mainOverride == 1 ) {
+      //data has come in while override is on
+      if(debug == 1)
         Serial.println("Data come in while override is on");
-        //change old values
-        oldBoiler = centralHeating.boiler;
-        oldPump = centralHeating.pump;
-      }
-      else {
-        //safe to change the normal ones
-        boiler = centralHeating.boiler;
-        pump = centralHeating.pump;
-      }
+      //change old values
+      oldBoiler = centralHeating.boiler;
+      oldPump = centralHeating.pump;
     }
-    centralHeating.override = mainOverride;
-    doRelays();
-    
-    
-    
-    unsigned long currentMillis = millis();
- 
-    if(currentMillis - previousMillis > interval) {
-      // save the last time you blinked the LED 
-      previousMillis = currentMillis;
-      send_rf_data();   
+    else {
+      //safe to change the normal ones
+      boiler = centralHeating.boiler;
+      pump = centralHeating.pump;
     }
+  }
+  centralHeating.override = mainOverride;
+  doRelays();
+
+
+
+  unsigned long currentMillis = millis();
+
+  if(currentMillis - previousMillis > interval) {
+    // save the last time you sent the data 
+    previousMillis = currentMillis;
+    send_rf_data();   
+  }
 }
 
 void send_rf_data()
@@ -97,7 +100,11 @@ void send_rf_data()
   digitalWrite(activityLed, HIGH);
   rf12_sleep(RF12_WAKEUP);
   // if ready to send + exit loop if it gets stuck as it seems too
-  int i = 0; while (!rf12_canSend() && i<10) {rf12_recvDone(); i++;}
+  int i = 0; 
+  while (!rf12_canSend() && i<10) {
+    rf12_recvDone(); 
+    i++;
+  }
   rf12_sendStart(0, &centralHeating, sizeof centralHeating);
   // set the sync mode to 2 if the fuses are still the Arduino default
   // mode 3 (full powerdown) can only be used with 258 CK startup fuses
@@ -111,10 +118,12 @@ void doRelays() {
   if(override != previousOverride) {
     previousOverride = override;
     overridePort.digiWrite2(override);
-    Serial.print("Changing Override to ");
-    Serial.println(override);
+    if(debug == 1) {
+      Serial.print("Changing Override to ");
+      Serial.println(override);
+    }
     mainOverride = override;
-    if(override ==1) {
+    if(override == 1) {
       //copy the values of the pump and boiler to oldPump and oldBoiler
       oldPump = pump;
       oldBoiler = boiler;
@@ -129,24 +138,29 @@ void doRelays() {
     }
   }
   //make no changes
-  
+
   if (boilerTracker != boiler) {
     boilerTracker = boiler;
     centralHeating.boiler = boiler;
     relays.digiWrite(boiler);
     leds.digiWrite(boiler);
-    Serial.print("Boiler Tracker Set to ");
-    Serial.println(boilerTracker);
+    if(debug == 1) {
+      Serial.print("Boiler Tracker Set to ");
+      Serial.println(boilerTracker);
+    }
   }
   if (pumpTracker != pump) {
     pumpTracker = pump;
     centralHeating.pump = pump;
     relays.digiWrite2(pump);
     leds.digiWrite2(pump);
-    Serial.print("Pump Tracker Set to ");
-    Serial.println(pumpTracker);
+    if(debug == 1) {
+      Serial.print("Pump Tracker Set to ");
+      Serial.println(pumpTracker);
+    }
   }
-  
+
 }
-  
+
+
 
